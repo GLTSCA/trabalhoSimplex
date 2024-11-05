@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Programação Linear</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 {
+            color: #007BFF;
+            margin-bottom: 10px;
+        }
+        .form-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        input, button, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 150px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #functionObjective, #constraintsContainer, #resultado {
+            background-color: white;
+            padding: 10px;
+            border-radius: 4px;
+            width: 90%;
+            max-width: 500px;
+            margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        ul {
+            padding-left: 20px;
+            margin: 0;
+        }
+        li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Calculadora de Programação Linear</h1>
+    <div class="form-group">
+        <label>Tipo de Otimização:</label>
+        <select id="optType">
+            <option value="max">Maximizar (Lucro Máximo)</option>
+            <option value="min">Minimizar (Custo Mínimo)</option>
+        </select>
+        
+        <input type="number" id="numVariables" min="2" placeholder="Nº Variáveis" required>
+        <input type="number" id="numConstraints" min="1" placeholder="Nº Restrições" required>
+        <button onclick="generateFields()">Gerar Campos</button>
+    </div>
+    
+    <div id="functionObjective"></div>
+    <div id="constraintsContainer"></div>
+    
+    <button onclick="calcular()">Calcular</button>
+    
+    <div id="resultado"></div>
+    <div id="plot"></div>
+
+    <script>
+        function generateFields() {
+            const numVariables = parseInt(document.getElementById("numVariables").value);
+            const numConstraints = parseInt(document.getElementById("numConstraints").value);
+            if (isNaN(numVariables) || numVariables < 2 || isNaN(numConstraints) || numConstraints < 1) {
+                alert("Por favor, insira um número de variáveis maior ou igual a 2 e pelo menos uma restrição.");
+                return;
+            }
+            
+            // Função Objetivo
+            let funcObjectiveHTML = "<h2>Função Objetivo: Z = </h2>";
+            for (let i = 1; i <= numVariables; i++) {
+                funcObjectiveHTML += `<input type="number" id="c${i}" placeholder="Coeficiente X${i}" required> * X${i}`;
+                if (i < numVariables) funcObjectiveHTML += " + ";
+            }
+            document.getElementById("functionObjective").innerHTML = funcObjectiveHTML;
+            
+            // Restrições
+            let constraintsHTML = "<h2>Restrições:</h2>";
+            for (let j = 1; j <= numConstraints; j++) {
+                constraintsHTML += `<div><label>Restrição ${j}: </label>`;
+                for (let i = 1; i <= numVariables; i++) {
+                    constraintsHTML += `<input type="number" id="a${j}_${i}" placeholder="Coeficiente X${i}" required> * X${i}`;
+                    if (i < numVariables) constraintsHTML += " + ";
+                }
+                constraintsHTML += ` ≤ <input type="number" id="r${j}" placeholder="Constante" required></div>`;
+            }
+            document.getElementById("constraintsContainer").innerHTML = constraintsHTML;
+        }
+
+        function calcular() {
+            const numVariables = parseInt(document.getElementById("numVariables").value);
+            const numConstraints = parseInt(document.getElementById("numConstraints").value);
+            const optType = document.getElementById("optType").value; // max ou min
+            let c = [];
+            let a = [];
+            let r = [];
+
+            // Obter coeficientes da função objetivo
+            for (let i = 1; i <= numVariables; i++) {
+                c.push(parseFloat(document.getElementById(`c${i}`).value));
+            }
+
+            // Obter coeficientes das restrições e constantes
+            for (let j = 1; j <= numConstraints; j++) {
+                let row = [];
+                for (let i = 1; i <= numVariables; i++) {
+                    row.push(parseFloat(document.getElementById(`a${j}_${i}`).value));
+                }
+                a.push(row);
+                r.push(parseFloat(document.getElementById(`r${j}`).value));
+            }
+
+            // Se o número de variáveis for maior que 2, apenas retornar os valores
+            if (numVariables > 2) {
+                document.getElementById("resultado").innerHTML = `
+                    <p><strong>Função Objetivo:</strong> Z = ${c.join(" * X")}</p>
+                    <p><strong>Restrições:</strong></p>
+                    <ul>
+                        ${a.map((row, index) => `<li>${row.join(" * X")} ≤ ${r[index]}</li>`).join('')}
+                    </ul>
+                    <p>Calculadora para mais de 2 variáveis: Resolução não implementada. Por favor, use um solver de programação linear para encontrar a solução ótima.</p>
+                `;
+                document.getElementById("plot").innerHTML = ""; // Limpa o gráfico
+                return;
+            }
+
+            // Implementação do método gráfico para 2 variáveis
+            if (numVariables === 2) {
+                const [c1, c2] = c;
+                const [a1, b1] = a[0];
+                const [a2, b2] = a[1];
+                const [r1, r2] = r;
+
+                // Verifica se o denominador é zero (para evitar divisão por zero)
+                const denominator = a1 * b2 - a2 * b1;
+                if (denominator === 0) {
+                    document.getElementById("resultado").innerHTML = "<p>As restrições são paralelas, portanto, não há solução viável.</p>";
+                    document.getElementById("plot").innerHTML = ""; // Limpa o gráfico
+                    return;
+                }
+
+                // Interseção das restrições
+                const x_opt = (r1 * b2 - r2 * b1) / denominator;
+                const y_opt = (r1 - a1 * x_opt) / b1;
+                
+                let z_opt;
+                if (optType === "max") {
+                    z_opt = c1 * x_opt + c2 * y_opt;
+                } else {
+                    z_opt = -(c1 * x_opt + c2 * y_opt); // Minimizar invertendo o sinal
+                }
+
+                // Verifica viabilidade e não negatividade
+                if (x_opt >= 0 && y_opt >= 0) {
+                    const resultText = optType === "max" ? "Valor máximo de Z" : "Valor mínimo de Z";
+                    document.getElementById("resultado").innerHTML = `
+                        <p><strong>Solução ótima:</strong> X1 = ${x_opt.toFixed(2)}, X2 = ${y_opt.toFixed(2)}</p>
+                        <p><strong>${resultText}:</strong> R$ ${z_opt.toFixed(2)}</p>
+                    `;
+                } else {
+                    document.getElementById("resultado").innerHTML = "<p>Não há uma solução ótima viável dentro das restrições dadas.</p>";
+                }
+
+                // Gráfico para duas variáveis
+                const layout = {
+                    title: 'Região de Solução e Função Objetivo',
+                    xaxis: { title: 'X1', range: [0, Math.max(x_opt, 0) * 1.5] },
+                    yaxis: { title: 'X2', range: [0, Math.max(y_opt, 0) * 1.5] },
+                    showlegend: false
+                };
+                
+                const lines = [];
+                for (let j = 0; j < numConstraints; j++) {
+                    const a1 = a[j][0];
+                    const b1 = a[j][1];
+                    const r1 = r[j];
+
+                    // Criar a linha das restrições
+                    const xValues = [0, r1 / a1];
+                    const yValues = [r1 / b1, 0];
+
+                    lines.push({
+                        x: xValues,
+                        y: yValues,
+                        mode: 'lines',
+                        name: `Restrição ${j + 1}`,
+                        line: { color: `rgba(0, 0, ${100 + j * 30}, 1)` }
+                    });
+                }
+
+                // Plotar a função objetivo como uma linha paralela
+                const zValues = [];
+                for (let x = 0; x <= Math.max(x_opt, 0) * 1.5; x += 0.1) {
+                    zValues.push((z_opt - c1 * x) / c2); // Rearranjando para y = (Z - c1 * x) / c2
+                }
+
+                const z = {
+                    x: Array.from({ length: zValues.length }, (_, i) => i * 0.1), // Valores de X
+                    y: zValues,
+                    mode: 'lines',
+                    name: 'Função Objetivo',
+                    line: { color: 'green', dash: 'dash' }
+                };
+
+                Plotly.newPlot("plot", [...lines, z], layout);
+            }
+        }
+    </script>
+</body>
+</html>
